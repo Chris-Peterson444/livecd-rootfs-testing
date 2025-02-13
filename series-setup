@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -eux
+
+series=$1
+
+lp-shell production devel \
+  -c 'print(lp.livefses.new(
+          owner=lp.me,
+          distro_series="/ubuntu/"+sys.argv[-1],
+          name="test",
+          metadata={}).web_link)' \
+  $series
