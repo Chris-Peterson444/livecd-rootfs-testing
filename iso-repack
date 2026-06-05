@@ -1,0 +1,82 @@
+#!/bin/bash
+set -eux
+
+# unpack an ISO, copy new install bits into the ISO, and repack it
+# uses https://github.com/mwhudson/livefs-editor for ISO manipulation
+
+src=/srv/iso/input.iso
+tgt=/srv/iso/output.iso
+
+startdir=$PWD
+builddir=.
+
+tmpdir=$(mktemp -d)
+trap "rm -fr $tmpdir" EXIT
+
+prefixes=(
+	livecd.ubuntu-server
+	livecd.ubuntu
+)
+
+# fix filenames by removing prefixes
+prefix=""
+for cur in ${prefixes[@]}; do
+	if [ -f $builddir/${cur}.manifest ] ; then
+		prefix=$cur
+	fi
+done
+
+if [ -n "$prefix" ] ; then
+	pushd $builddir
+	for f in *; do
+	    dest=${f/${prefix}./}
+	    if [ "$f" != "$dest" ] ; then
+		mv $f $dest
+	    fi
+	done
+	popd
+fi
+
+# fix kernel / initrd filenames
+pushd $builddir
+if [ -f initrd-generic ] ; then
+	mv initrd-generic initrd
+fi
+if [ -f kernel-generic ] ; then
+	mv kernel-generic vmlinuz
+fi
+popd
+
+# unpack initrd so we can get the uuid.conf - we need a copy of it in .disk
+echo "unmkinitramfs"
+pushd $tmpdir
+unmkinitramfs $startdir/$builddir/initrd .
+uuid_conf=$tmpdir/main/conf/uuid.conf
+if [ ! -e $uuid_conf ]; then
+    uuid_conf=$tmpdir/cpio4/conf/uuid.conf
+fi
+if [ ! -e $uuid_conf ]; then
+    uuid_conf=$tmpdir/conf/uuid.conf
+fi
+if [ ! -e $uuid_conf ]; then
+    echo "where is the casper uuid?"
+    bash
+    exit 1
+fi
+echo "uuid = $(cat $uuid_conf)"
+popd
+
+args=(
+    $src $tgt
+
+    --shell "rm -fr new/iso/casper"
+    --shell "cp -rv $startdir/$builddir new/iso/casper"
+    --shell "cp $uuid_conf new/iso/.disk/casper-uuid-generic"
+)
+
+LIVEFS_EDITOR="${LIVEFS_EDITOR-$src/livefs-editor}"
+[ -d $LIVEFS_EDITOR ] || git clone https://github.com/mwhudson/livefs-editor $LIVEFS_EDITOR
+
+LIVEFS_EDITOR=$(readlink -f $LIVEFS_EDITOR)
+
+sudo env PYTHONPATH=$LIVEFS_EDITOR python3 -m livefs_edit "${args[@]}"
