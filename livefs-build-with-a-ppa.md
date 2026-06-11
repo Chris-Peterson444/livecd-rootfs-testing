@@ -16,7 +16,7 @@ livefs build with a ppa
   --arch=amd64
   --livefs=~dbungert/+livefs/ubuntu/noble/test  # created with series-setup
   --ppa=~dbungert/ubuntu/livecd-rootfs          # ppa with livecd-rootfs to test
-  --metadata debug="True"                       # set -x
-  --metadata project="ubuntu-server"
-  --metadata subproject="live"
+  --metadata 'debug="True"'                     # set -x
+  --metadata 'project="ubuntu-server"'
+  --metadata 'subproject="live"'
 ```
